@@ -288,10 +288,7 @@ class ModapsClient(object):
         return self._parsedresponse(path, argdict, parser, data=data)[0]
 
     def getOrderUrl(self, OrderID):
-        """Order URL(?) for order ID. TODO: implement"""
-        raise NotImplementedError(
-            "Method {} not implemented. Probably won't be.".format("getOrderUrl")
-        )
+        return f"https://ladsweb.modaps.eosdis.nasa.gov/archive/orders/{OrderID}/"
 
     def getPostProcessingTypes(self, products):
         """Products: comma-concatenated string of valid product labels"""
