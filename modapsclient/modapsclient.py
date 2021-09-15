@@ -18,12 +18,14 @@ standard_library.install_aliases()
 
 from builtins import filter
 from builtins import object
+from pathlib import Path
+from tqdm import tqdm
 import sys
 import urllib.request, urllib.error, urllib.parse
 import logging
 from xml.dom import minidom
+import requests
 
-logging.basicConfig(level=logging.DEBUG)
 LOGGER = logging.getLogger("pygaarst.modapsclient")
 
 MODAPSBASEURL = (
@@ -32,6 +34,22 @@ MODAPSBASEURL = (
 MODAPSBASEURL_noTLS = (
     "http://modwebsrv.modaps.eosdis.nasa.gov/" "axis2/services/MODAPSservices"
 )
+
+
+def download_file(url, dst_filepath, headers={}):
+    resp = requests.get(url, stream=True, headers=headers)
+    total = int(resp.headers.get('content-length', 0))
+    with open(dst_filepath, 'wb') as file, tqdm(
+            desc=Path(dst_filepath).name,
+            total=total,
+            unit='iB',
+            unit_scale=True,
+            unit_divisor=1024,
+            leave=False
+    ) as bar:
+        for data in resp.iter_content(chunk_size=8192):
+            size = file.write(data)
+            bar.update(size)
 
 
 def _parsekeyvals(domobj, containerstr, keystr, valstr):
@@ -288,7 +306,30 @@ class ModapsClient(object):
         return self._parsedresponse(path, argdict, parser, data=data)[0]
 
     def getOrderUrl(self, OrderID):
-        return f"https://ladsweb.modaps.eosdis.nasa.gov/archive/orders/{OrderID}/"
+        return f"https://ladsweb.modaps.eosdis.nasa.gov/archive/orders/{OrderID}"
+
+    def fetchFilesForOrder(self, order_id, auth_token, path, with_progress=True):
+        order_url = self.getOrderUrl(OrderID=order_id)
+        headers = { 'Authorization': f'Bearer {auth_token}' }
+        r_order = requests.get(url=f"{order_url}.json", headers=headers)
+
+        if with_progress:
+            def _progress_items(items):
+                return tqdm(items, desc="items")
+        else:
+            def _progress_items(items):
+                return items
+
+        filepaths = []
+
+        for item in _progress_items(r_order.json()):
+            filename = item["name"]
+            dst_filepath = Path(path) / filename
+            file_url = f"{order_url}/{filename}"
+            if not dst_filepath.exists():
+                download_file(url=file_url, dst_filepath=dst_filepath)
+            filepaths.append(dst_filepath)
+        return filepaths
 
     def getPostProcessingTypes(self, products):
         """Products: comma-concatenated string of valid product labels"""
