@@ -322,12 +322,16 @@ class ModapsClient(object):
 
         filepaths = []
 
+        if r_order.status_code != 200:
+            raise Exception("There was an issue issuing the download request")
+
         for item in _progress_items(r_order.json()):
             filename = item["name"]
             dst_filepath = Path(path) / filename
+            Path(path).mkdir(exist_ok=True, parents=True)
             file_url = f"{order_url}/{filename}"
             if not dst_filepath.exists():
-                download_file(url=file_url, dst_filepath=dst_filepath)
+                download_file(url=file_url, dst_filepath=dst_filepath, headers=headers)
             filepaths.append(dst_filepath)
         return filepaths
 
